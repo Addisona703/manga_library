@@ -1,0 +1,8 @@
+manga_library
+storage
+.venv/
+*.pyc
+__pycache__/
+*.log
+*~
+*.db
