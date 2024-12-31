@@ -1,30 +1,37 @@
 import mysql.connector
-from mysql.connector import Error
-from config import db_config
+from mysql.connector import Error, pooling
+from config import DB_CONFIG
 
-def get_db_config(database_name=None):
-    """获取数据库配置，允许自定义数据库名"""
-    config = db_config.copy()
-    if database_name:
-        config['database'] = database_name
-    return config
+# 全局连接池
+connection_pool = None
 
-def connect_to_database(database_name=None):
-    """连接到MySQL数据库，可选择指定数据库名"""
+def init_pool():
+    """初始化连接池"""
+    global connection_pool
+    if connection_pool is None:
+        try:
+            pool_config = {
+                **DB_CONFIG,
+                'pool_name': 'manga_pool',
+                'pool_size': 5
+            }
+            connection_pool = mysql.connector.pooling.MySQLConnectionPool(**pool_config)
+        except Error as e:
+            print(f"连接池初始化失败: {e}")
+            raise e
+
+def get_connection():
+    """获取数据库连接"""
+    global connection_pool
+    if connection_pool is None:
+        init_pool()
+    return connection_pool.get_connection()
+
+def execute_query(query: str, params=None, fetch=False):
+    """执行SQL查询"""
+    connection = None
     try:
-        config = get_db_config(database_name)
-        return mysql.connector.connect(**config)
-    except Error as e:
-        print(f"数据库连接失败: {e}")
-        return None
-
-def execute_query(query, params=None, fetch=False, database_name=None):
-    """执行SQL查询，可指定数据库名"""
-    try:
-        connection = connect_to_database(database_name)
-        if not connection:
-            return None
-        
+        connection = get_connection()
         cursor = connection.cursor()
         cursor.execute(query, params or ())
         
@@ -39,8 +46,45 @@ def execute_query(query, params=None, fetch=False, database_name=None):
         return None
     
     finally:
-        if connection and connection.is_connected():
+        if connection:
             connection.close()
+
+def init_database():
+    """初始化数据库"""
+    try:
+        # 创建数据库
+        temp_conn = mysql.connector.connect(
+            host=DB_CONFIG['host'],
+            user=DB_CONFIG['user'],
+            password=DB_CONFIG['password']
+        )
+        cursor = temp_conn.cursor()
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_CONFIG['database']}")
+        cursor.close()
+        temp_conn.close()
+
+        # 创建表
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS manga_library (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                pdf_path VARCHAR(255) NOT NULL,
+                pdf_name VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 初始化连接池
+        init_pool()
+        print("数据库初始化完成")
+    except Error as e:
+        print(f"数据库初始化失败: {e}")
+        raise e
+
+# 在模块导入时初始化数据库和连接池
+try:
+    init_database()
+except Error as e:
+    print(f"数据库初始化失败，请检查配置: {e}")
 
 def save_pdf_to_database(pdf_name: str, pdf_path: str = "manga_library/") -> None:
     """保存PDF到数据库"""
@@ -67,23 +111,6 @@ def search_pdf_by_name(pdf_name: str, fuzzy: bool = True) -> list:
 def delete_pdf_from_database(pdf_name: str) -> None:
     """删除PDF记录"""
     execute_query("DELETE FROM manga_library WHERE pdf_name = %s", (pdf_name,))
-
-def init_database(database_name=None):
-    """初始化数据库和表，可指定数据库名"""
-    db_name = database_name or db_config['database']
-    
-    # 不指定数据库连接以创建数据库
-    execute_query(f"CREATE DATABASE IF NOT EXISTS {db_name}", database_name=None)
-    
-    # 创建表
-    execute_query("""
-        CREATE TABLE IF NOT EXISTS manga_library (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            pdf_path VARCHAR(255),
-            pdf_name VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """, database_name=db_name)
 
 if __name__ == "__main__":
     # 初始化数据库

@@ -4,6 +4,9 @@ from typing import List
 import pyfiglet
 import img2pdf
 from PIL import Image
+from rich import print
+from rich.text import Text
+from rich.console import Console
 
 OUTPUT_DIR = "manga_library"
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
@@ -54,9 +57,26 @@ def create_pdf(manga_name: str, storage_path: str = "storage") -> None:
     except Exception as e:
         print(f"生成 PDF 时出错：{e}")
 
-def create_ascii_art(text: str, font: str = "slant") -> str:
-    return pyfiglet.figlet_format(text, font=font)
+def create_ascii_art(text: str, font: str = "slant") -> Text:
+    ascii_art = pyfiglet.figlet_format(text, font=font)
+    gradient_text = Text()
+    colors = [
+        "#FF0000", "#FF4000", "#FF8000", "#FFBF00", 
+        "#FFFF00", "#80FF00", "#00FF00", "#00FF80", 
+        "#00FFFF", "#0080FF", "#0000FF", "#4B0082"
+    ]
+    
+    lines = ascii_art.split('\n')
+    for i, line in enumerate(lines):
+        if line.strip():
+            color = colors[i % len(colors)]
+            gradient_text.append(line + '\n', style=f"bold {color}")
+        else:
+            gradient_text.append('\n')
+    
+    return gradient_text
 
 if __name__ == "__main__":
-    print(create_ascii_art("Manga Library"))
+    console = Console()
+    console.print(create_ascii_art("Manga Library"))
     create_pdf("守矢的奇妙冒险3——去吃厄神料理吧")
