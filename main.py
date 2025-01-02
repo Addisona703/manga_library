@@ -3,6 +3,16 @@ from sql import *
 from crawler import MangaCrawler
 from util import *
 from __init__ import *
+import sys
+import signal
+from typing import NoReturn
+
+def signal_handler(signum, frame) -> NoReturn:
+    """处理 Ctrl+C 信号"""
+    print("\n\n正在安全退出程序...")
+    bye()
+    close_pool()
+    sys.exit(0)
 
 def open_pdf(pdf_name: str, pdf_path: str = "manga_library") -> None:
     print(f"正在打开漫画：{pdf_name}")
@@ -132,22 +142,41 @@ def delete_manga() -> None:
         return
 
 def main() -> None:
-    great()
-    menu_options = {'1': crawler, '2': manga_library, '3': search_manga, '4': delete_manga}
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     
-    while True:
-        channel()
-        choice = input("请选择一个选项: ")
-        if choice in ['q', 'quit']:
-            print("退出程序。")
-            break
+    try:
+        great()
+        menu_options = {'1': crawler, '2': manga_library, '3': search_manga, '4': delete_manga}
         
-        if action := menu_options.get(choice):
-            action()
-        else:
-            print("无效的选项，请重新选择。")
-    
-    bye()
+        while True:
+            try:
+                channel()
+                choice = input("请选择一个选项: ")
+                if choice.lower() in ['q', 'quit']:
+                    print("\n正在退出程序...")
+                    break
+                
+                if action := menu_options.get(choice):
+                    action()
+                else:
+                    print("无效的选项，请重新选择。")
+            except KeyboardInterrupt:
+                print("\n\n正在安全退出程序...")
+                break
+            except Exception as e:
+                print(f"\n发生错误: {e}")
+                print("程序将继续运行...")
+                continue
+        
+        bye()
+    except Exception as e:
+        print(f"\n程序发生错误: {e}")
+    finally:
+        # 使用专门的函数关闭连接池
+        close_pool()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

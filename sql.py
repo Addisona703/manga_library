@@ -104,13 +104,24 @@ def get_pdf_files_from_database() -> list:
 
 def search_pdf_by_name(pdf_name: str, fuzzy: bool = True) -> list:
     """搜索PDF文件"""
-    query = "SELECT pdf_path, pdf_name, created_at FROM manga_library WHERE pdf_name LIKE %s" if fuzzy else "SELECT pdf_path, pdf_name, created_at FROM manga_library WHERE pdf_name = %s"
+    query = "SELECT pdf_path, pdf_name, created_at FROM manga_library WHERE pdf_name LIKE %s" if fuzzy else "SELECT +pdf_path, pdf_name, created_at FROM manga_library WHERE pdf_name = %s"
     params = (f"%{pdf_name}%" if fuzzy else pdf_name,)
     return execute_query(query, params, True) or []
 
 def delete_pdf_from_database(pdf_name: str) -> None:
     """删除PDF记录"""
     execute_query("DELETE FROM manga_library WHERE pdf_name = %s", (pdf_name,))
+
+def close_pool():
+    """关闭连接池"""
+    global connection_pool
+    if connection_pool:
+        try:
+            connection_pool.close()
+        except Exception:
+            pass
+        finally:
+            connection_pool = None
 
 if __name__ == "__main__":
     # 初始化数据库

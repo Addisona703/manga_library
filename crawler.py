@@ -163,6 +163,16 @@ class MangaCrawler:
                     except Exception as e:
                         print(f"\n章节 {chapter_title} 下载失败: {e}")
 
+    def __del__(self):
+        """确保资源被释放"""
+        try:
+            if hasattr(self, 'session'):
+                self.session.close()
+            if hasattr(self, 'scraper'):
+                self.scraper.close()
+        except Exception:
+            pass
+
 def get_mangas(manga_name: str) -> Dict[str, str]:
     """获取漫画列表"""
     crawler = MangaCrawler()
